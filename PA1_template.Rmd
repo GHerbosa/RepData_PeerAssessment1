@@ -1,0 +1,81 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+
+## 1. Loading and preprocessing the data
+
+#Loading of useful packages
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+
+# Data processing and transferring to a working directory
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+zip <- "./reproducibleresearchW2/data.zip" 
+file_dir <- "./reproducibleresearchW2"
+unzip <- "./reproducibleresearchW2/assign"
+
+if (!file.exists(file_dir)) {
+    dir.create(file_dir)
+    }
+download.file(url,file.path(zip))
+unzip(zip,exdir=unzip)
+file <- file.path(unzip,"activity.csv")
+
+#Reading the downloaded data  
+activity <- read.csv(file)
+    activity$date <- ymd(activity$date)
+    activity$weekend <- as.factor(ifelse(weekdays(activity$date)=="Saturday" |       weekdays(activity$date)=="Sunday","weekend","weekday"))
+    activity$dayofweek <- as.factor(weekdays(activity$date))
+
+
+## 2. What is mean total number of steps taken per day?
+
+dailysteps <- activity %>% group_by(date) %>% summarise(dailysteps = sum(steps,na.rm = TRUE))
+qplot(dailysteps,data=dailysteps,na.rm=TRUE,binwidth=500,xlab='Daily Total Steps', ylab='Frequency',main = 'Histogram of Daily Total Steps')
+
+dailysteps_mean <- dailysteps %>% summarise(average = mean(dailysteps,na.rm = TRUE),median=median(dailysteps,na.rm = TRUE))
+    dailysteps_mean
+
+
+## 3. What is the average daily activity pattern?
+
+average_int5 <- activity %>% group_by(interval) %>% summarise(average = mean(steps,na.rm = TRUE))
+qplot(interval,average,data=average_int5,geom="line",xlab = "Intervals (5 Minutes)",ylab = "Average Steps")
+
+average_int5[which.max(average_int5$average),]
+
+
+## 4. Imputing missing values
+
+#Data subset without NA
+activity_noNA <- activity[which(!is.na(activity$steps)),]
+  
+#Mean calculation for intervals
+interval_each <- activity_noNA %>% group_by(interval) %>% summarise(average=mean(steps))
+    interval_each$average <- as.integer(interval_each$average)
+    
+#Data subset with NA
+activity_yesNA <- activity[which(is.na(activity$steps)),]
+    
+# Values for NA based on average interval
+activity_yesNA$steps <- ifelse(activity_yesNA$interval==interval_each$interval,interval_each$average)
+    
+#Combining the two dataset using rbind
+activity_combined <- rbind(activity_noNA,activity_yesNA)
+nrow(activity_yesNA)
+ 
+# Total daily steps
+daily_steps_combined <- activity_combined %>% group_by(date) %>% summarise(dailysteps = sum(steps))
+
+qplot(dailysteps,data=daily_steps_combined,na.rm=TRUE,binwidth=500,xlab='Total steps per day', ylab='Frequency',main = 'Histogram of Daily Steps')
+ 
+
+## 5. Are there differences in activity patterns between weekdays and weekends?
+
+meansteps <- activity_combined %>% group_by(interval,weekend) %>%   summarise(average = mean(steps))
+
+qplot(interval,average,data=meansteps,geom="line",facets=weekend~.,xlab="5-minute interval",ylab="Average Steps",main="Average steps for Weekday and Weekend")
